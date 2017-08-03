@@ -1,0 +1,14 @@
+{
+  "name": "OnTheRoad",
+  "version": "0.0.0",
+  "description": "a server for the unity websocket example I am working on",
+  "main": "ws.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "unity"
+  ],
+  "author": "saarg",
+  "license": "ISC"
+}
