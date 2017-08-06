@@ -4,7 +4,7 @@ class DriftMode {
   }
 
   addClient(ws) {
-    console.log('new DriftMode client');
+    console.log('[%s] New DriftMode client', ws.ip);
 
     this.clients.push(ws);
 
@@ -27,8 +27,7 @@ class DriftMode {
     }
 
     ws.context = this;
-    ws.onmessage = this.message;
-    //ws.on('message', (message) => this.message(message, ws));
+    ws.addEventListener('message', this.message);
   }
 
   message(message) {
@@ -36,14 +35,23 @@ class DriftMode {
     let context = this.context;
     let index = context.clients.indexOf(ws);
 
-    for (let i = 0; i < context.clients.length; i++) {
-      if (i === index)
-        continue;
+    const opcode = message.data.toString("utf8").slice(0, 3);
+    const content = message.data.toString("utf8").slice(4);
 
-      if (context.clients[i].readyState === 1){
-        console.log(message.data.toString("utf8"));
-        context.clients[i].send('tra (' + index + ')' + message.data.toString("utf8"));
+    if (opcode == "tra") {
+      for (let i = 0; i < context.clients.length; i++) {
+        if (i === index)
+          continue;
+
+        if (context.clients[i].readyState === 1){
+          context.clients[i].send('tra (' + index + ')' + content);
+        }
       }
+    }
+    else if (opcode == "qut")
+    {
+      ws.removeEventListener('message', context.message);
+      console.log("[%s] Client disconnected from DriftMode", ws.ip)
     }
   }
 }

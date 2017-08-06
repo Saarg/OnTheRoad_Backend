@@ -6,16 +6,16 @@ class Pool {
   }
 
   addClient(client) {
-    console.log("Client joined %d", this.seed);
+    console.log("[%s] Client joined %d", client.socket.ip, this.seed);
     client.seed = this.seed;
 
-    client.socket.context = this;
+    client.socket.poolContext = this;
     client.socket.addEventListener('message', this.message);
     this.clients.push(client);
   }
 
   removeClient(client) {
-    console.log("Client left %d", this.seed);
+    console.log("[%s] Client left %d", client.socket.ip, this.seed);
     client.seed = -1;
     client.socket.removeEventListener('message', this.message);
     this.clients.splice(this.clients.indexOf(client), 1);
@@ -23,9 +23,7 @@ class Pool {
 
   message(message) {
     let ws = this;
-    let context = this.context;
-
-    console.log("received: " + message.data.toString("utf8"));
+    let context = this.poolContext;
 
     const opcode = message.data.toString("utf8").slice(0, 3);
     const content = message.data.toString("utf8").slice(4).replace(',', '.');
@@ -35,8 +33,13 @@ class Pool {
       if (!context.record || context.record > parseFloat(content)) {
         context.record = parseFloat(content);
 
-        console.log("New record of: %d in randomMode: %d", context.record, context.seed);
+        console.log("[%s] New record of: %d in randomMode: %d", ws.ip, context.record, context.seed);
       }
+    }
+    else if (opcode == "qut")
+    {
+      ws.removeEventListener('message', context.message);
+      console.log("[%s] Client disconnected from RandomMode", ws.ip)
     }
   }
 }
@@ -56,7 +59,7 @@ class RandomMode {
   }
 
   addClient(ws) {
-    console.log('new RandomMode client');
+    console.log('[%s] New RandomMode client', ws.ip);
 
     if (this.clients[ws] === undefined)
       this.clients[ws] = new Client(-1, ws);
@@ -65,21 +68,32 @@ class RandomMode {
       ws.send("acc Connected to RandomMode online");
     }
 
-    ws.on('message', (message) => {
-      const opcode = message.slice(0, 3);
-      const content = message.slice(4);
+    ws.context = this;
+    ws.addEventListener('message', this.message);
+  }
 
-      if (opcode == "sed") {
-        const seed = parseInt(content);
+  message(message) {
+    let ws = this;
+    let context = this.context;
 
-        if (this.maps[seed] === undefined)
-          this.maps[seed] = new Pool(parseInt(seed));
+    const opcode = message.data.toString("utf8").slice(0, 3);
+    const content = message.data.toString("utf8").slice(4);
 
-        if (this.maps[this.clients[ws].seed])
-          this.maps[this.clients[ws].seed].removeClient(this.clients[ws]);
-        this.maps[seed].addClient(this.clients[ws]);
-      }
-    });
+    if (opcode == "sed") {
+      const seed = parseInt(content);
+
+      if (context.maps[seed] === undefined)
+        context.maps[seed] = new Pool(parseInt(seed));
+
+      if (context.maps[context.clients[ws].seed])
+        context.maps[context.clients[ws].seed].removeClient(context.clients[ws]);
+      context.maps[seed].addClient(context.clients[ws]);
+    }
+    else if (opcode == "qut")
+    {
+      this.removeEventListener('message', context.message);
+      console.log("[%s] Client disconnected from RandomMode %d", ws.ip, context.clients[ws].seed)
+    }
   }
 }
 
